@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TATA AURA - OpenRoad Hazard Dashboard</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary: #0f172a;
+            --accent: #2563eb;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .badge {
+            background-color: var(--accent);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .sidebar {
+            width: 380px;
+            background: var(--card-bg);
+            border-left: 1px solid #e2e8f0;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            overflow-y: auto;
+            z-index: 2;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.05);
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .stat-card {
+            background: var(--bg);
+            padding: 0.85rem;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-card h4 {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .filter-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-filter {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-filter.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .feed-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .feed-item {
+            padding: 10px;
+            border-radius: 6px;
+            background: var(--bg);
+            border-left: 4px solid var(--accent);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .feed-item:hover {
+            background: #f1f5f9;
+        }
+
+        .feed-item.high { border-left-color: var(--danger); }
+        .feed-item.medium { border-left-color: var(--warning); }
+        .feed-item.resolved { border-left-color: var(--success); }
+
+        .popup-title {
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+
+        .popup-meta {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+
+        .popup-tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .bg-danger { background-color: var(--danger); }
+        .bg-warning { background-color: var(--warning); }
+        .bg-success { background-color: var(--success); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-group">
+            <h2>TATA AURA</h2>
+            <span class="badge">AURA-OpenRoad Portal</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #94a3b8;">
+            Live Sensor Telematics & Civic Audit Network
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div id="map"></div>
+
+        <div class="sidebar">
+            <h3>National Road Health Overview</h3>
+            
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <h4>Active Craters</h4>
+                    <div class="value" style="color: var(--danger);" id="active-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Consensus Validated</h4>
+                    <div class="value" style="color: var(--accent);" id="validated-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Repaired (24h)</h4>
+                    <div class="value" style="color: var(--success);" id="repaired-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>AURA Telemetry Nodes</h4>
+                    <div class="value">142.8k</div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Filter Hazard Severity</label>
+                <div class="btn-group">
+                    <button class="btn-filter active" onclick="filterMarkers('all')">All</button>
+                    <button class="btn-filter" onclick="filterMarkers('high')">Severe</button>
+                    <button class="btn-filter" onclick="filterMarkers('medium')">Moderate</button>
+                    <button class="btn-filter" onclick="filterMarkers('resolved')">Fixed</button>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Recent Telematics Feeds</label>
+                <div class="feed-list" id="feed-list">
+                    <!-- Dynamic feeds generated via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize Leaflet map centered on India
+        const map = L.map('map').setView([20.5937, 78.9629], 5);
+
+        // Load OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors | TATA AURA Engine'
+        }).addTo(map);
+
+        // Mock Pothole Dataset across major Indian Highways/Corridors
+        const potholeData = [
+            { id: 101, lat: 28.6139, lng: 77.2090, location: "NH-48 (Delhi-Gurugram Border)", severity: "high", consensus: 14, gForce: "3.4g", timestamp: "10 mins ago", status: "unresolved" },
+            { id: 102, lat: 19.0760, lng: 72.8777, location: "Western Express Highway, Mumbai", severity: "high", consensus: 22, gForce: "4.1g", timestamp: "25 mins ago", status: "unresolved" },
+            { id: 103, lat: 12.9716, lng: 77.5946, location: "Outer Ring Road, Bengaluru", severity: "medium", consensus: 8, gForce: "2.1g", timestamp: "1 hour ago", status: "unresolved" },
+            { id: 104, lat: 13.0827, lng: 80.2707, location: "NH-32 (Chennai Bypass)", severity: "resolved", consensus: 31, gForce: "1.8g", timestamp: "3 hours ago", status: "fixed" },
+            { id: 105, lat: 22.5726, lng: 88.3639, location: "EM Bypass, Kolkata", severity: "medium", consensus: 5, gForce: "2.6g", timestamp: "40 mins ago", status: "unresolved" },
+            { id: 106, lat: 17.3850, lng: 78.4867, location: "PVNR Expressway, Hyderabad", severity: "high", consensus: 19, gForce: "3.8g", timestamp: "15 mins ago", status: "unresolved" },
+            { id: 107, lat: 26.9124, lng: 75.7873, location: "Jaipur-Ajmer Highway (NH-48)", severity: "resolved", consensus: 12, gForce: "1.5g", timestamp: "5 hours ago", status: "fixed" },
+            { id: 108, lat: 26.8467, lng: 80.9462, location: "Lucknow-Agra Expressway", severity: "medium", consensus: 9, gForce: "2.2g", timestamp: "2 hours ago", status: "unresolved" }
+        ];
+
+        let markers = [];
+
+        // Custom marker colors
+        function getMarkerColor(severity, status) {
+            if (status === 'fixed') return '#10b981'; // Green
+            return severity === 'high' ? '#ef4444' : '#f59e0b'; // Red or Amber
+        }
+
+        // Render markers on map
+        function renderMap(data) {
+            // Clear existing
+            markers.forEach(m => map.removeLayer(m.marker));
+            markers = [];
+
+            let active = 0, validated = 0, repaired = 0;
+
+            data.forEach(item => {
+                if (item.status === 'fixed') repaired++;
+                else {
+                    active++;
+                    if (item.consensus >= 3) validated++;
+                }
+
+                const color = getMarkerColor(item.severity, item.status);
+                
+                const circleMarker = L.circleMarker([item.lat, item.lng], {
+                    radius: 9,
+                    fillColor: color,
+                    color: '#ffffff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.85
+                }).addTo(map);
+
+                const popupContent = `
+                    <div class="popup-title">${item.location}</div>
+                    <div class="popup-meta">Geohash Vector: [${item.lat.toFixed(3)}, ${item.lng.toFixed(3)}]</div>
+                    <div style="margin-bottom: 6px;">
+                        <span class="popup-tag ${item.status === 'fixed' ? 'bg-success' : (item.severity === 'high' ? 'bg-danger' : 'bg-warning')}">
+                            ${item.status === 'fixed' ? 'REPAIRED' : item.severity.toUpperCase() + ' IMPACT'}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.8rem; line-height: 1.4;">
+                        <b>Vertical Impact:</b> ${item.gForce}<br>
+                        <b>AURA Telematics Passes:</b> ${item.consensus} vehicles<br>
+                        <b>First Logged:</b> ${item.timestamp}
+                    </div>
+                `;
+
+                circleMarker.bindPopup(popupContent);
+
+                markers.push({
+                    id: item.id,
+                    severity: item.severity,
+                    status: item.status,
+                    marker: circleMarker,
+                    lat: item.lat,
+                    lng: item.lng
+                });
+            });
+
+            // Update stats
+            document.getElementById('active-count').innerText = active;
+            document.getElementById('validated-count').innerText = validated;
+            document.getElementById('repaired-count').innerText = repaired;
+
+            renderSidebarList(data);
+        }
+
+        // Populate side panel feed
+        function renderSidebarList(data) {
+            const listEl = document.getElementById('feed-list');
+            listEl.innerHTML = '';
+
+            data.forEach(item => {
+                const div = document.createElement('div');
+                const cssClass = item.status === 'fixed' ? 'resolved' : item.severity;
+                div.className = `feed-item ${cssClass}`;
+                div.innerHTML = `
+                    <div style="font-weight: 600;">${item.location}</div>
+                    <div style="color: #64748b; font-size: 0.75rem; margin-top: 2px;">
+                        Impact: ${item.gForce} | Consensus: ${item.consensus} Pass(es)
+                    </div>
+                `;
+                div.onclick = () => {
+                    map.flyTo([item.lat, item.lng], 12, { duration: 1.5 });
+                    const target = markers.find(m => m.id === item.id);
+                    if (target) target.marker.openPopup();
+                };
+                listEl.appendChild(div);
+            });
+        }
+
+        // Filter button functionality
+        function filterMarkers(category) {
+            document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (category === 'all') {
+                renderMap(potholeData);
+            } else if (category === 'resolved') {
+                renderMap(potholeData.filter(d => d.status === 'fixed'));
+            } else {
+                renderMap(potholeData.filter(d => d.severity === category && d.status !== 'fixed'));
+            }
+        }
+
+        // Initial render
+        renderMap(potholeData);
+    </script>
+</body>
+</html>
